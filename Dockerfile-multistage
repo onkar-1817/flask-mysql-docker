@@ -1,0 +1,39 @@
+# ------------------- Stage 1: Build Stage ------------------------------
+FROM python:3.11 AS builder
+
+WORKDIR /app
+
+# Install build dependencies for mysqlclient
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    default-libmysqlclient-dev \
+    pkg-config \
+    libssl-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ------------------- Stage 2: Final Stage ------------------------------
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libmariadb3 \
+    libssl3 \
+    libffi8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages and binaries
+COPY --from=builder /usr/local/lib/python3.11/site-packages/ /usr/local/lib/python3.11/site-packages/
+COPY --from=builder /usr/local/bin/ /usr/local/bin/
+
+# Copy application code
+COPY . .
+
+CMD ["python", "app.py"]
